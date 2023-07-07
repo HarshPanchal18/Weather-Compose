@@ -9,7 +9,7 @@ import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 
-class MainViewModel() : ViewModel() {
+class MainViewModel : ViewModel() {
 
     private val _weatherData = MutableLiveData<CurrentWeatherResponse>()
     val weatherData: LiveData<CurrentWeatherResponse> get() = _weatherData
@@ -38,7 +38,6 @@ class MainViewModel() : ViewModel() {
                 val responseBody = response.body()
                 if (!response.isSuccessful || responseBody == null) {
                     onError("Data Processing Error")
-                    return
                 }
                 _isLoading.value = false
                 _weatherData.postValue(responseBody)
@@ -53,12 +52,10 @@ class MainViewModel() : ViewModel() {
 
     private fun onError(inputMessage: String?) {
         val message =
-            if (inputMessage.isNullOrBlank() or inputMessage.isNullOrEmpty()) "Unknown Error"
+            if (inputMessage.isNullOrBlank()) "Unknown Error"
             else inputMessage
 
-        errorMessage = StringBuilder("ERROR: ")
-            .append("$message some data may not displayed properly").toString()
-
+        errorMessage = "ERROR: $message some data may not be displayed properly"
         _isError.value = true
         _isLoading.value = false
     }

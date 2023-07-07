@@ -19,7 +19,7 @@ class ApiConfig {
                 .build()
 
             val retroFit = Retrofit.Builder()
-                .baseUrl("http://api.weatherapi.com/v1/")
+                .baseUrl("https://api.weatherapi.com/v1/")
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(client)
                 .build()
@@ -29,6 +29,4 @@ class ApiConfig {
 
         const val API_KEY = "85f4362a0f17468daaf121518230507"
     }
-
-    val API_KEY = "85f4362a0f17468daaf121518230507"
 }
