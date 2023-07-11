@@ -1,12 +1,14 @@
 package com.example.weather_compose
 
 import android.os.Bundle
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +35,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,37 +47,56 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import coil.compose.rememberAsyncImagePainter
 import com.example.weather_compose.model.CurrentWeatherResponse
 import com.example.weather_compose.ui.theme.WeatherComposeTheme
 import com.example.weather_compose.viewModel.MainViewModel
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
+
 class MainActivity : ComponentActivity() {
 
     private val mainViewModel by viewModels<MainViewModel>()
+    private lateinit var weatherModel: MutableState<CurrentWeatherResponse?>
+    private lateinit var imm: InputMethodManager
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            rememberSystemUiController().setStatusBarColor(color = Color.White)
             WeatherComposeTheme {
+                val systemUiController = rememberSystemUiController()
+                SideEffect {
+                    systemUiController.setSystemBarsColor(color = Color.Transparent)
+                }
+                imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
                 val cityInput = remember { mutableStateOf("") }
                 val trailingIconView = @Composable {
-                    IconButton(onClick = { cityInput.value = "" }) {
+                    IconButton(onClick = {
+                        cityInput.value = ""
+                        imm.toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, 0)
+                    }) {
                         Icon(Icons.Default.Clear, null, tint = Color.Black)
                     }
                 }
-                val roundShape = RoundedCornerShape(10.dp)
+                val roundShape30dp = RoundedCornerShape(30.dp)
+                weatherModel = remember { mutableStateOf(null) }
+                val backgroundGradient = remember(weatherModel.value?.current?.tempC) {
+                    setGradient(
+                        ((weatherModel.value?.current?.tempC ?: 5.0) as Double?)!!
+                    )
+                }
 
                 // A surface container using the 'background' color from the theme
                 Surface(
@@ -83,21 +106,13 @@ class MainActivity : ComponentActivity() {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    listOf(
-                                        Color.Blue.copy(0.25F),
-                                        Color(0xFF00A5FD),
-                                        Color(0xFF4EB8F1),
-                                        Color.White
-                                    )
-                                )
-                            )
-                            .padding(10.dp)
-                        //horizontalAlignment = Alignment.CenterHorizontally
+                            .background(brush = Brush.verticalGradient(backgroundGradient))
+                            .padding(horizontal = 10.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(bottom = 20.dp),
+                            modifier = Modifier
+                                .padding(bottom = 20.dp)
+                                .padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             TextField(
@@ -105,9 +120,9 @@ class MainActivity : ComponentActivity() {
                                 onValueChange = { cityInput.value = it },
                                 modifier = Modifier
                                     .weight(1F)
-                                    .background(color = Color.White, shape = roundShape)
-                                    .shadow(elevation = 2.dp, shape = roundShape)
-                                    .clip(shape = roundShape),
+                                    .shadow(elevation = 2.dp, shape = roundShape30dp)
+                                    .background(color = Color.White, shape = roundShape30dp)
+                                    .clip(shape = roundShape30dp),
                                 colors = TextFieldDefaults.textFieldColors(
                                     containerColor = Color.LightGray.copy(0.20f),
                                     cursorColor = Color.Blue.copy(0.35F),
@@ -118,6 +133,7 @@ class MainActivity : ComponentActivity() {
                                 ),
                                 placeholder = { Text("Enter City") },
                                 singleLine = true,
+                                maxLines = 1,
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.Place,
@@ -142,14 +158,48 @@ class MainActivity : ComponentActivity() {
                         } // Row
 
                         mainViewModel.isLoading.observeAsState().value.let { isLoading ->
-                            if (isLoading == true)
+                            if (isLoading == true) {
                                 Box(modifier = Modifier.fillMaxSize()) {
-                                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.align(Alignment.Center),
+                                        color = Color.Cyan
+                                    )
                                 }
+                            }
                         }
 
                         mainViewModel.isError.observeAsState().value.let { isError ->
-                            if (isError == true) Text(mainViewModel.errorMessage)
+                            if (isError == true) {
+                                val errorMessage =
+                                    if (mainViewModel.errorMessage.contains("Unable to resolve host"))
+                                        "Unable to connect to network. Please make sure you're connected with Internet."
+                                    else
+                                        "Unable to find weather for \"${cityInput.value}\". Make sure you're entering the correct city."
+                                val errorDrawable =
+                                    if (mainViewModel.errorMessage.contains("Unable to resolve host"))
+                                        R.drawable.no_connection
+                                    else
+                                        R.drawable.no_data_found
+
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Image(
+                                        painter = painterResource(errorDrawable),
+                                        contentDescription = null,
+                                        modifier = Modifier.padding(top = 10.dp)
+                                    )
+                                    Text(
+                                        text = errorMessage,
+                                        color = Color.DarkGray,
+                                        fontSize = 18.sp,
+                                        fontFamily = FontFamily.Serif,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
                         }
 
                         mainViewModel.weatherData.observeAsState().value.let { data ->
@@ -165,6 +215,7 @@ class MainActivity : ComponentActivity() {
     fun GetWeatherButton(city: String) {
         Button(
             onClick = {
+                imm.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0)
                 if (city.isNotBlank()) {
                     mainViewModel.getWeatherData(city.trim())
                 } else {
@@ -191,6 +242,7 @@ class MainActivity : ComponentActivity() {
             horizontalAlignment = Alignment.Start
         ) {
             if (weatherData != null) {
+                weatherModel.value = weatherData
                 weatherData.location.let { location ->
                     Text(
                         text = "📍 ${location?.name}, ${location?.region}, ${location?.country}",
@@ -276,6 +328,51 @@ class MainActivity : ComponentActivity() {
                     contentScale = ContentScale.FillBounds
                 )
             }
+        }
+    }
+
+    private fun setGradient(tempC: Double): MutableList<Color> {
+        return when (tempC) {
+            in 10F..23F -> {
+                mutableListOf(
+                    Color.Blue.copy(0.45F),
+                    Color(0xFF00A5FD),
+                    Color(0xFF4EB8F1),
+                    Color.White
+                )
+            }
+
+            in 23F..30F -> {
+                mutableListOf(
+                    Color(0xFF606263),
+                    Color(0xFF84888A),
+                    Color(0xFFB0B7BB),
+                    Color.White
+                )
+            }
+
+            in 30F..35F -> {
+                mutableListOf(
+                    Color(0xFFF8D93B),
+                    Color(0xFFE4D67F),
+                    Color(0xFFE0D9AE),
+                    Color.White
+                )
+            }
+
+            in 35F..45F -> {
+                mutableListOf(
+                    Color(0xFFFDA000),
+                    Color(0xFFF5AF37),
+                    Color(0xFFEEBF6E),
+                    Color.White
+                )
+            }
+
+            else -> mutableListOf(
+                Color(0xC800A5FD),
+                Color.White
+            )
         }
     }
 
