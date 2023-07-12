@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Place
@@ -36,7 +38,6 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,9 +45,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -57,14 +60,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
 import coil.compose.rememberAsyncImagePainter
 import com.example.weather_compose.model.CurrentWeatherResponse
 import com.example.weather_compose.ui.theme.WeatherComposeTheme
 import com.example.weather_compose.viewModel.MainViewModel
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
-
+@Suppress("DEPRECATION")
 class MainActivity : ComponentActivity() {
 
     private val mainViewModel by viewModels<MainViewModel>()
@@ -76,19 +78,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             WeatherComposeTheme {
+                val focusManager = LocalFocusManager.current
                 val systemUiController = rememberSystemUiController()
-                SideEffect {
-                    systemUiController.setSystemBarsColor(color = Color.Transparent)
-                }
+                systemUiController.setSystemBarsColor(color = Color.Transparent)
                 imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
                 val cityInput = remember { mutableStateOf("") }
                 val trailingIconView = @Composable {
                     IconButton(onClick = {
                         cityInput.value = ""
+                        focusManager.moveFocus(FocusDirection.Previous)
                         imm.toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, 0)
-                    }) {
-                        Icon(Icons.Default.Clear, null, tint = Color.Black)
-                    }
+                    }) { Icon(Icons.Default.Clear, null, tint = Color.Black) }
                 }
                 val roundShape30dp = RoundedCornerShape(30.dp)
                 weatherModel = remember { mutableStateOf(null) }
@@ -153,8 +153,22 @@ class MainActivity : ComponentActivity() {
                                     fontFamily = FontFamily.SansSerif
                                 ),
                             )
+
                             Spacer(Modifier.width(10.dp))
-                            GetWeatherButton(city = cityInput.value)
+
+                            GetWeatherButton(city = cityInput.value) {
+                                imm.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0)
+                                focusManager.clearFocus()
+                                if (cityInput.value.isNotBlank()) {
+                                    mainViewModel.getWeatherData(cityInput.value.trim())
+                                } else {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        "Enter the city please!!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
                         } // Row
 
                         mainViewModel.isLoading.observeAsState().value.let { isLoading ->
@@ -212,23 +226,13 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun GetWeatherButton(city: String) {
+    fun GetWeatherButton(city: String, onClick: () -> Unit) {
         Button(
-            onClick = {
-                imm.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0)
-                if (city.isNotBlank()) {
-                    mainViewModel.getWeatherData(city.trim())
-                } else {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Enter the city please!!",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            },
+            onClick = { onClick() },
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Blue.copy(0.35F),
-                disabledContainerColor = Color.LightGray
+                containerColor = Color.Blue.copy(0.65F),
+                disabledContainerColor = Color.LightGray,
+                contentColor = Color.LightGray
             ),
             enabled = city.isNotEmpty(),
             elevation = ButtonDefaults.buttonElevation(10.dp)
@@ -238,7 +242,9 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun SetResultText(weatherData: CurrentWeatherResponse?) {
         Column(
-            modifier = Modifier.padding(horizontal = 5.dp),
+            modifier = Modifier
+                .padding(horizontal = 5.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.Start
         ) {
             if (weatherData != null) {
@@ -309,7 +315,22 @@ class MainActivity : ComponentActivity() {
                         fontSize = 18.sp,
                         fontFamily = FontFamily.Serif,
                     )
-                }
+
+                    /*weatherData.astronomy.let { astro ->
+                        Text(
+                            text = "🌞 ${astro?.sunrise ?: "N/A"} ${astro?.sunset ?: "N/A"}",
+                            color = Color.DarkGray,
+                            fontSize = 18.sp,
+                            fontFamily = FontFamily.Serif,
+                        )
+                        Text(
+                            text = "🌚 ${astro?.moonrise ?: "N/A"} ${astro?.moonset ?: "N/A"}",
+                            color = Color.DarkGray,
+                            fontSize = 18.sp,
+                            fontFamily = FontFamily.Serif,
+                        )
+                    }*/
+                } // current
             } // if
         } // Column
     }
@@ -331,8 +352,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun setGradient(tempC: Double): MutableList<Color> {
-        return when (tempC) {
+    private fun setGradient(tempC: Double?): MutableList<Color> {
+        return when (tempC!!) {
             in 10F..23F -> {
                 mutableListOf(
                     Color.Blue.copy(0.45F),

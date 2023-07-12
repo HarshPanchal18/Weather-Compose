@@ -3,8 +3,8 @@ package com.example.weather_compose.viewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import com.example.weather_compose.networking.ApiConfig
 import com.example.weather_compose.model.CurrentWeatherResponse
+import com.example.weather_compose.networking.ApiConfig
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response

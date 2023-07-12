@@ -17,13 +17,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val DarkColorPalette = darkColorScheme(
+private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
     tertiary = Pink80
 )
 
-private val LightColorPalette = lightColorScheme(
+private val LightColorScheme = lightColorScheme(
     primary = Purple40,
     secondary = PurpleGrey40,
     tertiary = Pink40
@@ -64,27 +64,24 @@ fun WeatherComposeTheme(
         }
     }
 
-    val colors = if (darkTheme) {
-        DarkColorPalette
-    } else {
-        LightColorPalette
-    }
+    val colors = if (darkTheme) DarkColorPalette
+     else LightColorPalette
 
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = colors,
         typography = Typography,
         content = content
     )
 }
 
-private val LightColorScheme = lightColorScheme(
+private val LightColorPalette = lightColorScheme(
     surface = Blue,
     onSurface = Color.White,
     primary = LightBlue,
     onPrimary = Navy
 )
 
-private val DarkColorScheme = darkColorScheme(
+private val DarkColorPalette = darkColorScheme(
     surface = Blue,
     onSurface = Navy,
     primary = Navy,
